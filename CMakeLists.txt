@@ -8,19 +8,14 @@ find_package(dechamps_ASIOUtil CONFIG REQUIRED)
 find_package(sndfile CONFIG REQUIRED)
 
 set(CMAKE_CXX_STANDARD 20)
-add_compile_options(
-	/WX /W4 /permissive- /analyze
-
-	# Suppress warnings about shadowing declarations.
-	#
-	# In most cases, this happens when a lambda is used to initialize some
-	# variable, and the lambda declares a local variable with the same name as the
-	# variable it's tasked with initializing. In such cases the shadowing is
-	# actually desirable, because it prevents one from accidentally using the (not
-	# yet initialized) outer variable instead of the (valid) local variable within
-	# the lambda.
-	/wd4458 /wd4456
-)
+# clang-cl does not implement MSVC /analyze.
+# /wd4458 and /wd4456 suppress shadowing warnings from lambdas that intentionally
+# reuse the name of the variable they initialize.
+set(_warning_options /WX /W4 /permissive- /wd4458 /wd4456)
+if(NOT (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC"))
+	list(APPEND _warning_options /analyze)
+endif()
+add_compile_options(${_warning_options})
 
 add_library(ASIOTest SHARED test.cpp dll.def)
 target_link_libraries(ASIOTest

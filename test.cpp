@@ -293,7 +293,7 @@ namespace ASIOTest {
 		using SndfileUniquePtr = std::unique_ptr<SNDFILE, SndfileCloser>;
 
 		using SndfileWithInfo = std::pair<SndfileUniquePtr, SF_INFO>;
-		SndfileWithInfo OpenSndfile(const std::string_view path, int mode, SF_INFO sfInfo = { 0 }) {
+		SndfileWithInfo OpenSndfile(const std::string_view path, int mode, SF_INFO sfInfo = {}) {
 			SndfileUniquePtr sndfile(sf_open(std::string(path).c_str(), mode, &sfInfo));
 			if (sndfile == NULL) throw std::runtime_error("Unable to open sound file '" + std::string(path) + "': " + sf_strerror(NULL));
 			return { std::move(sndfile), sfInfo };
@@ -359,7 +359,7 @@ namespace ASIOTest {
 				const auto sfFormat = ASIOSampleTypeToSfFormatType(sampleType);
 				if (!sfFormat.has_value()) throw std::runtime_error("ASIO sample type " + ::dechamps_ASIOUtil::GetASIOSampleTypeString(sampleType) + " is not supported as an output file format");
 
-				SF_INFO sfInfo = { 0 };
+				SF_INFO sfInfo {};
 				sfInfo.samplerate = sampleRate;
 				sfInfo.channels = channels;
 				switch (*sfFormat & SF_FORMAT_ENDMASK) {
@@ -429,7 +429,7 @@ namespace ASIOTest {
 
 		private:
 			std::optional<ASIODriverInfo> Init() {
-				ASIODriverInfo asioDriverInfo = { 0 };
+				ASIODriverInfo asioDriverInfo {};
 				asioDriverInfo.asioVersion = 2;
 				Log(false) << "Initializing driver...";
 				Log() << "ASIOInit(asioVersion = " << asioDriverInfo.asioVersion << ")";
@@ -630,6 +630,16 @@ namespace ASIOTest {
 				function_pointer_traits<decltype(ASIOCallbacks::asioMessage)>::function asioMessage;
 				function_pointer_traits<decltype(ASIOCallbacks::bufferSwitchTimeInfo)>::function bufferSwitchTimeInfo;
 
+			private:
+				// clang-cl requires this function to be defined before use because its return type is deduced.
+				template <auto memberFunction> auto GetASIOCallback() const {
+					return [](auto... args) {
+						if (global == nullptr) abort();
+						return (global->*memberFunction)(args...);
+					};
+				}
+
+			public:
 				ASIOCallbacks GetASIOCallbacks() const {
 					ASIOCallbacks callbacks;
 					callbacks.bufferSwitch = GetASIOCallback<&Callbacks::bufferSwitch>();
@@ -640,13 +650,6 @@ namespace ASIOTest {
 				}
 
 			private:
-				template <auto memberFunction> auto GetASIOCallback() const {
-					return [](auto... args) {
-						if (global == nullptr) abort();
-						return (global->*memberFunction)(args...);
-					};
-				}
-
 				static Callbacks* global;
 			};
 
